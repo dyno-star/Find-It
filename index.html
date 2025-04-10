@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lost & Found App</title>
+    <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.development.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #6EE7B7 0%, #3B82F6 100%);
+        }
+    </style>
+</head>
+<body>
+    <div id="root" class="min-h-screen gradient-bg"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        const CameraCapture = ({ onCapture }) => {
+            const videoRef = useRef(null);
+            const [error, setError] = useState(null);
+
+            useEffect(() => {
+                navigator.mediaDevices.getUserMedia({ video: true })
+                    .then(stream => {
+                        videoRef.current.srcObject = stream;
+                    })
+                    .catch(err => setError("Please allow camera access to capture items"));
+
+                return () => {
+                    if (videoRef.current?.srcObject) {
+                        videoRef.current.srcObject.getTracks().forEach(track => track.stop());
+                    }
+                };
+            }, []);
+
+            const capturePhoto = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = videoRef.current.videoWidth;
+                canvas.height = videoRef.current.videoHeight;
+                canvas.getContext('2d').drawImage(videoRef.current, 0, 0);
+                onCapture(canvas.toDataURL('image/jpeg'));
+            };
+
+            return (
+                <div className="relative">
+                    {error && <p className="text-red-600 text-center mb-2">{error}</p>}
+                    <video ref={videoRef} autoPlay className="w-full max-w-md rounded-xl shadow-2xl border-4 border-white" />
+                    <button 
+                        onClick={capturePhoto}
+                        className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white text-blue-600 px-6 py-2 rounded-full shadow-lg hover:bg-blue-100 transition-all duration-300"
+                    >
+                        Capture
+                    </button>
+                </div>
+            );
+        };
+
+        const FoundItem = ({ item, onDelete }) => (
+            <div className="bg-white/90 backdrop-blur-sm p-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300">
+                <img src={item.photo} alt={item.description} className="w-full h-64 object-cover rounded-lg mb-4" />
+                <div className="space-y-2">
+                    <h3 className="text-lg font-bold text-gray-800">{item.description}</h3>
+                    <p className="text-gray-600">Location: {item.location}</p>
+                    <p className="text-gray-500 text-sm">Category: {item.category}</p>
+                    <p className="text-gray-400 text-xs">Found: {new Date(item.timestamp).toLocaleString()}</p>
+                    <button
+                        onClick={() => onDelete(item.id)}
+                        className="text-red-500 hover:text-red-700 text-sm"
+                    >
+                        Remove
+                    </button>
+                </div>
+            </div>
+        );
+
+        const App = () => {
+            const [foundItems, setFoundItems] = useState(() => JSON.parse(localStorage.getItem('foundItems')) || []);
+            const [currentPhoto, setCurrentPhoto] = useState(null);
+            const [formData, setFormData] = useState({ description: '', location: '', category: 'General' });
+            const [searchTerm, setSearchTerm] = useState('');
+            const [errors, setErrors] = useState({});
+
+            useEffect(() => {
+                localStorage.setItem('foundItems', JSON.stringify(foundItems));
+            }, [foundItems]);
+
+            const validateForm = () => {
+                const newErrors = {};
+                if (!formData.description.trim()) newErrors.description = 'Description is required';
+                if (!formData.location.trim()) newErrors.location = 'Location is required';
+                setErrors(newErrors);
+                return Object.keys(newErrors).length === 0;
+            };
+
+            const handlePost = () => {
+                if (!currentPhoto || !validateForm()) return;
+                
+                const newItem = {
+                    id: Date.now(),
+                    photo: currentPhoto,
+                    ...formData,
+                    timestamp: Date.now()
+                };
+                setFoundItems([newItem, ...foundItems]);
+                setCurrentPhoto(null);
+                setFormData({ description: '', location: '', category: 'General' });
+                setErrors({});
+            };
+
+            const handleDelete = (id) => {
+                setFoundItems(foundItems.filter(item => item.id !== id));
+            };
+
+            const filteredItems = foundItems.filter(item =>
+                item.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                item.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                item.category.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+
+            return (
+                <div className="container mx-auto p-6 max-w-5xl">
+                    <h1 className="text-4xl font-extrabold text-white text-center mb-8 drop-shadow-lg">
+                        Lost & Found Hub
+                    </h1>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        {/* Capture Section */}
+                        <div className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-xl">
+                            <h2 className="text-2xl font-semibold text-gray-800 mb-6">Report Found Item</h2>
+                            <CameraCapture onCapture={setCurrentPhoto} />
+                            
+                            {currentPhoto && (
+                                <div className="mt-6 space-y-4">
+                                    <img src={currentPhoto} alt="Preview" className="w-full max-w-sm mx-auto rounded-lg shadow-md" />
+                                    
+                                    <div>
+                                        <input
+                                            type="text"
+                                            value={formData.description}
+                                            onChange={(e) => setFormData({...formData, description: e.target.value})}
+                                            placeholder="Item description"
+                                            className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-400"
+                                        />
+                                        {errors.description && <p className="text-red-500 text-sm">{errors.description}</p>}
+                                    </div>
+
+                                    <div>
+                                        <input
+                                            type="text"
+                                            value={formData.location}
+                                            onChange={(e) => setFormData({...formData, location: e.target.value})}
+                                            placeholder="Found location"
+                                            className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-400"
+                                        />
+                                        {errors.location && <p className="text-red-500 text-sm">{errors.location}</p>}
+                                    </div>
+
+                                    <select
+                                        value={formData.category}
+                                        onChange={(e) => setFormData({...formData, category: e.target.value})}
+                                        className="w-full p-3 rounded-lg border border-gray-300"
+                                    >
+                                        <option value="General">General</option>
+                                        <option value="Electronics">Electronics</option>
+                                        <option value="Clothing">Clothing</option>
+                                        <option value="Books">Books</option>
+                                        <option value="Jewelry">Jewelry</option>
+                                    </select>
+
+                                    <button
+                                        onClick={handlePost}
+                                        className="w-full bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition-all duration-300 shadow-md"
+                                    >
+                                        Post Item
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Items List */}
+                        <div>
+                            <div className="mb-6">
+                                <input
+                                    type="text"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    placeholder="Search items..."
+                                    className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-400 shadow-sm"
+                                />
+                            </div>
+                            <div className="space-y-6">
+                                {filteredItems.length === 0 ? (
+                                    <p className="text-white text-center text-lg">No items found</p>
+                                ) : (
+                                    filteredItems.map(item => (
+                                        <FoundItem key={item.id} item={item} onDelete={handleDelete} />
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
