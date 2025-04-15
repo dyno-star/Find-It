@@ -1,11 +1,14 @@
 import { Item } from '../types/Item';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiX } from 'react-icons/fi';
+import { FC } from 'react';
 
 interface ModalProps {
   item: Item | null;
   onClose: () => void;
 }
+
+const CloseIcon: FC<{ size?: number }> = ({ size }) => <FiX size={size} />;
 
 export const Modal = ({ item, onClose }: ModalProps) => {
   if (!item) return null;
@@ -29,7 +32,7 @@ export const Modal = ({ item, onClose }: ModalProps) => {
           <div className="modal-header">
             <h2>{item.title}</h2>
             <button onClick={onClose} className="close-btn">
-              <FiX size={24} />
+              <CloseIcon size={24} />
             </button>
           </div>
           {item.image && <img src={item.image} alt={item.title} className="modal-image" />}
