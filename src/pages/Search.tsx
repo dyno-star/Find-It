@@ -1,78 +1,38 @@
-import { useEffect, useState } from 'react';
-import { Navbar } from '../components/Navbar';
 import { SearchItems } from '../components/SearchItems';
-import { LostItemForm } from '../components/LostItemForm';
 import { Modal } from '../components/Modal';
+import { Navbar } from '../components/Navbar';
 import { Item } from '../types/Item';
-import { toast, ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { useState } from 'react';
 
 export const Search = () => {
   const [items, setItems] = useState<Item[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
 
-  useEffect(() => {
-    const storedItems = localStorage.getItem('lostItems');
-    if (storedItems) {
-      setItems(JSON.parse(storedItems));
-    }
-    setLoading(false);
-  }, []);
-
   const handleEdit = (item: Item) => {
-    setEditingItem(item);
-  };
-
-  const handleUpdate = (updatedItem: Item) => {
-    setLoading(true);
-    const updatedItems = items.map((item) =>
-      item.id === updatedItem.id ? updatedItem : item
-    );
-    setItems(updatedItems);
-    localStorage.setItem('lostItems', JSON.stringify(updatedItems));
-    setEditingItem(null);
-    setLoading(false);
+    console.log('Edit item:', item);
+    // Add edit logic
   };
 
   const handleDelete = (id: string) => {
-    setLoading(true);
-    const updatedItems = items.filter((item) => item.id !== id);
-    setItems(updatedItems);
-    localStorage.setItem('lostItems', JSON.stringify(updatedItems));
-    setLoading(false);
+    setItems(items.filter((item) => item.id !== id));
   };
 
-  if (loading) {
-    return (
-      <div className="page loading">
-        <p>Loading...</p>
-      </div>
-    );
-  }
+  const handleView = (item: Item) => {
+    setSelectedItem(item);
+  };
 
   return (
-    <div className="page">
+    <div className="search-page">
       <Navbar />
-      <div className="page-content">
-        {editingItem ? (
-          <LostItemForm
-            onSubmit={handleUpdate}
-            initialItem={editingItem}
-            isEdit
-          />
-        ) : (
-          <SearchItems
-            items={items}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            onView={setSelectedItem}
-          />
-        )}
+      <div className="content">
+        <SearchItems
+          items={items}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          onView={handleView}
+        />
+        <Modal item={selectedItem} onClose={() => setSelectedItem(null)} />
       </div>
-      <Modal item={selectedItem} onClose={() => setSelectedItem(null)} />
-      <ToastContainer position="top-right" autoClose={3000} />
     </div>
   );
 };
