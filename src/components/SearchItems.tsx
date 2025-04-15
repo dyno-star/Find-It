@@ -84,6 +84,17 @@ export const SearchItems = ({ items, onEdit, onDelete, onView }: SearchItemsProp
         </select>
       </div>
       <div className="items-grid">
+        {paginatedItems.map((item) => (
+          <div key={item.id} className="item-card">
+            <h3>{item.title}</h3>
+            <p>{item.description}</p>
+            <div className="item-actions">
+              <button onClick={() => onView(item)}>View</button>
+              <button onClick={() => onEdit(item)}>Edit</button>
+              <button onClick={() => handleDelete(item.id)}>Delete</button>
+            </div>
+          </div>
+        ))}
       </div>
       {totalPages > 1 && (
         <div className="pagination">
