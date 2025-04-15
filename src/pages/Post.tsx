@@ -1,45 +1,19 @@
-import { useEffect, useState } from 'react';
-import { Navbar } from '../components/Navbar';
 import { LostItemForm } from '../components/LostItemForm';
 import { Item } from '../types/Item';
-import { toast, ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { Navbar } from '../components/Navbar';
 
 export const Post = () => {
-  const [items, setItems] = useState<Item[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const storedItems = localStorage.getItem('lostItems');
-    if (storedItems) {
-      setItems(JSON.parse(storedItems));
-    }
-    setLoading(false);
-  }, []);
-
-  const handleSubmit = (newItem: Item) => {
-    setLoading(true);
-    const updatedItems = [...items, newItem];
-    setItems(updatedItems);
-    localStorage.setItem('lostItems', JSON.stringify(updatedItems));
-    setLoading(false);
+  const handleSubmit = (item: Item) => {
+    console.log('Submitted item:', item);
+    // Add logic to save the item (e.g., API call)
   };
 
-  if (loading) {
-    return (
-      <div className="page loading">
-        <p>Loading...</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="page">
+    <div className="post-page">
       <Navbar />
-      <div className="page-content">
+      <div className="content">
         <LostItemForm onSubmit={handleSubmit} />
       </div>
-      <ToastContainer position="top-right" autoClose={3000} />
     </div>
   );
 };
