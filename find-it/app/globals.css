@@ -10,6 +10,8 @@
   --error: #ef4444;
   --border: #e2e8f0;
   --card-bg: #ffffff;
+  --glass-bg: rgba(255, 255, 255, 0.1);
+  --glass-blur: blur(10px);
 }
 
 @theme inline {
@@ -37,13 +39,15 @@
     --error: #f87171;
     --border: #1e293b;
     --card-bg: #1e293b;
+    --glass-bg: rgba(30, 41, 59, 0.2);
+    --glass-blur: blur(10px);
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  font-family: 'Inter', var(--font-geist-sans), Arial, Helvetica, sans-serif;
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
@@ -53,8 +57,25 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes slideIn {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(0); }
+}
+
 .fade-in {
   animation: fadeIn 0.5s ease-out;
+}
+
+.slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+/* Glassmorphism */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 /* Scrollbar styling */
