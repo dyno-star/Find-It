@@ -1,103 +1,99 @@
+import Link from "next/link";
 import Image from "next/image";
+import Navbar from "./components/navbar";
 
 export default function Home() {
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <div className="min-h-screen flex flex-col">
+      <Navbar />
+      <div className="pt-16">
+        {/* Hero Section */}
+        <section className="bg-gradient-to-r from-primary to-primary-hover text-white py-20 px-4 sm:px-6 lg:px-8">
+          <div className="max-w-7xl mx-auto text-center fade-in">
+            <h1 className="text-4xl sm:text-5xl font-bold mb-4">
+              Find It: Reunite with Your Lost Items
+            </h1>
+            <p className="text-lg sm:text-xl mb-8 max-w-2xl mx-auto">
+              Lost something on campus? Found an item that isn't yours? Use Find It to post, search, and reconnect with lost belongings.
+            </p>
+            <div className="flex justify-center gap-4">
+              <Link
+                href="/post"
+                className="inline-flex items-center justify-center bg-white text-primary font-semibold px-6 py-3 rounded-full hover:bg-gray-100 transition-colors"
+              >
+                Post a Found Item
+              </Link>
+              <Link
+                href="/search"
+                className="inline-flex items-center justify-center border-2 border-white text-white font-semibold px-6 py-3 rounded-full hover:bg-white hover:text-primary transition-colors"
+              >
+                Search for Lost Items
+              </Link>
+            </div>
+          </div>
+        </section>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+        {/* Description Section */}
+        <section className="py-16 px-4 sm:px-6 lg:px-8 bg-card-bg">
+          <div className="max-w-7xl mx-auto text-center fade-in">
+            <h2 className="text-3xl font-bold mb-6">How Find It Works</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
+              <div className="p-6 bg-background rounded-lg shadow-md">
+                <div className="w-10 h-10 mx-auto mb-4 rounded-full bg-primary flex items-center justify-center text-white font-bold">
+                  1
+                </div>
+                <h3 className="text-xl font-semibold mb-2">Post Found Items</h3>
+                <p className="text-secondary">
+                  Found an item? Upload a photo, add a description, and tag it with details like location and category.
+                </p>
+              </div>
+              <div className="p-6 bg-background rounded-lg shadow-md">
+                <div className="w-10 h-10 mx-auto mb-4 rounded-full bg-primary flex items-center justify-center text-white font-bold">
+                  2
+                </div>
+                <h3 className="text-xl font-semibold mb-2">Search for Lost Items</h3>
+                <p className="text-secondary">
+                  Lost something? Search for your items using tags, keywords, or location.
+                </p>
+              </div>
+              <div className="p-6 bg-background rounded-lg shadow-md">
+                <div className="w-10 h-10 mx-auto mb-4 rounded-full bg-primary flex items-center justify-center text-white font-bold">
+                  3
+                </div>
+                <h3 className="text-xl font-semibold mb-2">Reunite</h3>
+                <p className="text-secondary">
+                  Connect with the person who found or lost the item to arrange a pickup.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Recent Posts Section (Mock) */}
+        <section className="py-16 px-4 sm:px-6 lg:px-8">
+          <div className="max-w-7xl mx-auto fade-in">
+            <h2 className="text-3xl font-bold mb-6 text-center">Recent Found Items</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="bg-card-bg rounded-lg shadow-md overflow-hidden">
+                  <Image
+                    src="/placeholder.svg"
+                    alt="Lost item"
+                    width={300}
+                    height={200}
+                    className="w-full h-48 object-cover"
+                  />
+                  <div className="p-4">
+                    <h3 className="text-lg font-semibold">Lost Keys</h3>
+                    <p className="text-secondary">Found near Library on Apr 20, 2025</p>
+                    <p className="text-sm mt-2">Tags: Keys, Silver, Keychain</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      </div>
     </div>
   );
 }
