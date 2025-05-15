@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import Navbar from "../components/navbar";
@@ -26,11 +26,300 @@ export default function Post() {
   });
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [isCameraLoading, setIsCameraLoading] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
   const [tagInput, setTagInput] = useState("");
-  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Check for camera support
+  const [isCameraSupported, setIsCameraSupported] = useState<boolean | null>(null);
+  
+  // Check browser support for camera on component mount
+  useEffect(() => {
+    const checkCameraSupport = async () => {
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          console.log("Camera API is not supported in this browser");
+          setIsCameraSupported(false);
+          return;
+        }
+        
+        // Try to enumerate devices to check for cameras
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const hasVideoDevice = devices.some(device => device.kind === 'videoinput');
+        
+        console.log(`Camera support: ${hasVideoDevice ? "Available" : "Not available"}`);
+        setIsCameraSupported(hasVideoDevice);
+      } catch (err) {
+        console.error("Error checking camera support:", err);
+        // If there's an error, assume camera might be supported
+        setIsCameraSupported(true);
+      }
+    };
+    
+    checkCameraSupport();
+  }, []);
 
-  // Handle file upload (camera or gallery)
+  // Start camera with improved error handling and timeout management
+  const startCamera = async () => {
+    setIsCameraLoading(true);
+    setError(null);
+    setCameraError(null);
+
+    // Clear any existing timeout
+    if (cameraTimeoutRef.current) {
+      clearTimeout(cameraTimeoutRef.current);
+    }
+
+    // Set a new timeout for camera loading
+    cameraTimeoutRef.current = setTimeout(() => {
+      if (isCameraLoading) {
+        stopCamera();
+        setCameraError("Camera took too long to load. Please try again or upload an image.");
+      }
+    }, 10000); // 10 seconds timeout
+
+    try {
+      console.log("Requesting camera access...");
+      
+      // First check if getUserMedia is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Camera API is not supported in this browser");
+      }
+      
+      // List available devices to help with debugging
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(device => device.kind === 'videoinput');
+      console.log(`Found ${videoDevices.length} camera devices:`, videoDevices);
+      
+      // Request camera access with fallback options
+      const constraints = {
+        video: {
+          width: { ideal: 320 },
+          height: { ideal: 240 },
+          facingMode: { ideal: "environment" }
+        }
+      };
+      
+      console.log("Requesting media with constraints:", constraints);
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      console.log("Camera stream obtained successfully");
+      
+      const videoTracks = stream.getVideoTracks();
+      if (videoTracks.length === 0) {
+        throw new Error("No video track found in media stream");
+      }
+      
+      console.log("Using camera:", videoTracks[0].label);
+      
+      if (videoRef.current) {
+        // Ensure video element is properly initialized
+        videoRef.current.muted = true;
+        videoRef.current.playsInline = true;
+        videoRef.current.autoplay = true;
+        videoRef.current.srcObject = stream;
+        
+        console.log("Video element initialized with stream");
+        
+        // Add a loadeddata event which is more reliable than loadedmetadata
+        videoRef.current.onloadeddata = () => {
+          console.log("Video data loaded");
+          
+          if (videoRef.current) {
+            console.log("Attempting to play video");
+            
+            // Force a repaint to help with iOS Safari
+            setTimeout(() => {
+              if (videoRef.current) {
+                videoRef.current.play()
+                  .then(() => {
+                    console.log("Video playback started successfully");
+                    setIsCameraActive(true);
+                    setIsCameraLoading(false);
+                    
+                    // Clear the timeout since camera loaded successfully
+                    if (cameraTimeoutRef.current) {
+                      clearTimeout(cameraTimeoutRef.current);
+                      cameraTimeoutRef.current = null;
+                    }
+                  })
+                  .catch((err) => {
+                    console.error("Camera play error:", err);
+                    setCameraError(`Failed to start video stream: ${err.message}. Please try again or upload an image.`);
+                    stopCamera();
+                  });
+              }
+            }, 100);
+          }
+        };
+        
+        // Handle various video events
+        videoRef.current.onloadedmetadata = () => console.log("Video metadata loaded");
+        videoRef.current.oncanplay = () => console.log("Video can play");
+        videoRef.current.onplay = () => console.log("Video play event fired");
+        
+        // Handle video errors more specifically
+        videoRef.current.onerror = (e) => {
+          console.error("Video element error:", e);
+          setCameraError(`Video playback error: ${videoRef.current?.error?.message || "Unknown error"}. Please try again.`);
+          stopCamera();
+        };
+        
+        streamRef.current = stream;
+      } else {
+        throw new Error("Video element reference is not available");
+      }
+    } catch (err: any) {
+      // Clear the timeout since we already have an error
+      if (cameraTimeoutRef.current) {
+        clearTimeout(cameraTimeoutRef.current);
+        cameraTimeoutRef.current = null;
+      }
+      
+      console.error("Camera access error:", err);
+      
+      let errorMessage = "Failed to access camera.";
+      
+      if (err.name === "NotAllowedError") {
+        errorMessage = "Camera access denied. Please allow camera access in your browser settings.";
+      } else if (err.name === "NotFoundError") {
+        errorMessage = "No camera found on this device. Please try uploading an image instead.";
+      } else if (err.name === "NotReadableError") {
+        errorMessage = "Camera is already in use by another application. Please close other apps using the camera.";
+      } else if (err.name === "AbortError") {
+        errorMessage = "Camera access was aborted. Please try again.";
+      } else if (err.name === "OverconstrainedError") {
+        errorMessage = "Your camera doesn't support the requested resolution. Please try again with different settings.";
+      } else if (err.name === "SecurityError") {
+        errorMessage = "Camera access is blocked due to security restrictions in your browser.";
+      } else if (err.name === "TypeError") {
+        errorMessage = "Camera constraints are not supported by your browser.";
+      } else {
+        errorMessage = `Camera error: ${err.message || err.name}. Please try uploading an image instead.`;
+      }
+      
+      setCameraError(errorMessage);
+      stopCamera();
+    }
+  };
+
+  // Stop camera with improved cleanup
+  const stopCamera = () => {
+    console.log("Stopping camera...");
+    
+    // Clean up the video element
+    if (videoRef.current) {
+      console.log("Cleaning up video element");
+      // Important: set srcObject to null before removing event listeners
+      videoRef.current.pause();
+      videoRef.current.srcObject = null;
+      
+      // Remove all event handlers
+      videoRef.current.onloadeddata = null;
+      videoRef.current.onloadedmetadata = null;
+      videoRef.current.oncanplay = null;
+      videoRef.current.onplay = null;
+      videoRef.current.onerror = null;
+    }
+    
+    // Stop all media tracks
+    if (streamRef.current) {
+      console.log("Stopping all media tracks");
+      const tracks = streamRef.current.getTracks();
+      tracks.forEach((track) => {
+        console.log(`Stopping track: ${track.kind} (${track.label})`);
+        track.stop();
+      });
+      streamRef.current = null;
+    }
+    
+    // Clear any pending timeout
+    if (cameraTimeoutRef.current) {
+      console.log("Clearing camera timeout");
+      clearTimeout(cameraTimeoutRef.current);
+      cameraTimeoutRef.current = null;
+    }
+    
+    setIsCameraActive(false);
+    setIsCameraLoading(false);
+  };
+
+  // Capture photo with better error handling
+  const capturePhoto = () => {
+    try {
+      console.log("Capturing photo...");
+      
+      if (!videoRef.current) {
+        console.error("Video reference is null when trying to capture");
+        setError("Cannot capture photo: video element not found");
+        return;
+      }
+      
+      if (!canvasRef.current) {
+        console.error("Canvas reference is null when trying to capture");
+        setError("Cannot capture photo: canvas element not found");
+        return;
+      }
+      
+      // Make sure video is playing
+      if (videoRef.current.paused || videoRef.current.ended) {
+        console.error("Cannot capture - video is paused or ended");
+        setError("Cannot capture photo: video is not playing");
+        return;
+      }
+      
+      // Get video dimensions
+      const videoWidth = videoRef.current.videoWidth;
+      const videoHeight = videoRef.current.videoHeight;
+      
+      if (videoWidth === 0 || videoHeight === 0) {
+        console.error("Video dimensions are invalid:", videoWidth, videoHeight);
+        setError("Cannot capture photo: invalid video dimensions");
+        return;
+      }
+      
+      console.log(`Video dimensions: ${videoWidth}x${videoHeight}`);
+      
+      const context = canvasRef.current.getContext("2d");
+      if (!context) {
+        console.error("Failed to get canvas context");
+        setError("Cannot capture photo: unable to get drawing context");
+        return;
+      }
+      
+      // Set canvas dimensions to match video
+      canvasRef.current.width = videoWidth;
+      canvasRef.current.height = videoHeight;
+      
+      // Draw the video frame to the canvas
+      context.drawImage(videoRef.current, 0, 0, videoWidth, videoHeight);
+      console.log("Video frame drawn to canvas");
+      
+      // Convert canvas to image data
+      const imageData = canvasRef.current.toDataURL("image/jpeg", 0.8);
+      console.log("Canvas converted to JPEG data URL");
+      
+      // Update state with the captured image
+      setImagePreview(imageData);
+      setFormData((prev) => ({ ...prev, image: imageData }));
+      
+      // Stop the camera
+      stopCamera();
+      
+      console.log("Photo captured successfully");
+    } catch (err) {
+      console.error("Error capturing photo:", err);
+      setError(`Failed to capture photo: ${err instanceof Error ? err.message : "unknown error"}`);
+      stopCamera();
+    }
+  };
+
+  // Handle file upload (gallery or file system)
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -87,6 +376,13 @@ export default function Post() {
     }));
   };
 
+  // Cleanup camera on unmount
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -110,9 +406,6 @@ export default function Post() {
       // Reset form
       setFormData({ image: "", description: "", tags: [], location: "" });
       setImagePreview(null);
-      if (cameraInputRef.current) {
-        cameraInputRef.current.value = "";
-      }
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -128,7 +421,7 @@ export default function Post() {
       <div className="pt-16 py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-3xl mx-auto fade-in">
           <h1 className="text-3xl font-bold mb-8 text-center">Post a Found Item</h1>
-          <form onSubmit={handleSubmit} className="space General">space-y-6 bg-card-bg p-8 rounded-lg shadow-md"
+          <form onSubmit={handleSubmit} className="space-y-6 bg-card-bg p-8 rounded-lg shadow-md">
             {error && (
               <div className="bg-error/10 border border-error text-error p-4 rounded">
                 {error}
@@ -139,26 +432,18 @@ export default function Post() {
             <div>
               <label className="block text-sm font-medium mb-2">Item Image</label>
               <div className="border-2 border-dashed border-border rounded-lg p-4 text-center">
-                {!imagePreview && (
+                {!isCameraActive && !imagePreview && !isCameraLoading && !cameraError && (
                   <div className="space-y-4">
                     <div className="flex justify-center gap-4">
-                      <div>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          capture="environment" // Prompts camera on mobile
-                          onChange={handleFileUpload}
-                          className="hidden"
-                          id="camera-upload"
-                          ref={cameraInputRef}
-                        />
-                        <label
-                          htmlFor="camera-upload"
+                      {isCameraSupported !== false && (
+                        <button
+                          type="button"
+                          onClick={startCamera}
                           className="cursor-pointer inline-flex items-center justify-center bg-primary text-white px-4 py-2 rounded hover:bg-primary-hover transition-colors"
                         >
                           Take Photo
-                        </label>
-                      </div>
+                        </button>
+                      )}
                       <div>
                         <input
                           type="file"
@@ -177,8 +462,117 @@ export default function Post() {
                       </div>
                     </div>
                     <p className="text-sm text-secondary">
-                      Take a photo with your camera or upload an image from your device.
+                      {isCameraSupported === false 
+                        ? "Camera not supported on this device. Please upload an image from your device." 
+                        : "Take a photo with your camera or upload an image from your device."}
                     </p>
+                  </div>
+                )}
+                {isCameraLoading && (
+                  <div className="text-secondary flex flex-col items-center justify-center space-y-3">
+                    <div className="flex items-center space-x-2">
+                      <svg
+                        className="animate-spin h-5 w-5 text-primary"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        ></circle>
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        ></path>
+                      </svg>
+                      <span>Loading camera...</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={stopCamera}
+                      className="text-sm text-error hover:underline"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+                {cameraError && (
+                  <div className="space-y-4">
+                    <p className="text-error">{cameraError}</p>
+                    <div className="flex justify-center gap-4">
+                      <button
+                        type="button"
+                        onClick={startCamera}
+                        className="inline-flex items-center justify-center bg-primary text-white px-4 py-2 rounded hover:bg-primary-hover transition-colors"
+                      >
+                        Retry Camera
+                      </button>
+                      <div>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleFileUpload}
+                          className="hidden"
+                          id="file-upload"
+                          ref={fileInputRef}
+                        />
+                        <label
+                          htmlFor="file-upload"
+                          className="cursor-pointer inline-flex items-center justify-center bg-secondary text-white px-4 py-2 rounded hover:bg-secondary/80 transition-colors"
+                        >
+                          Upload Image
+                        </label>
+                      </div>
+                    </div>
+                    <p className="mt-4 text-sm text-secondary">
+                      To enable camera access, check your browser's address bar or settings and allow camera permissions.
+                    </p>
+                  </div>
+                )}
+                {isCameraActive && (
+                  <div className="space-y-4">
+                    <div className="relative w-full max-w-md mx-auto">
+                      <video 
+                        ref={videoRef} 
+                        autoPlay 
+                        playsInline 
+                        muted
+                        className="w-full max-w-md mx-auto rounded bg-gray-100" 
+                        style={{ minHeight: "240px" }}
+                      />
+                      {/* Video loading indicator */}
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="p-4 bg-white/70 rounded-lg shadow-sm">
+                          <p className="text-sm text-gray-600">
+                            {videoRef.current && videoRef.current.readyState < 2 
+                              ? "Initializing camera..." 
+                              : "Camera active"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex justify-center gap-4">
+                      <button
+                        type="button"
+                        onClick={capturePhoto}
+                        className="inline-flex items-center justify-center bg-primary text-white px-4 py-2 rounded hover:bg-primary-hover transition-colors"
+                      >
+                        Capture
+                      </button>
+                      <button
+                        type="button"
+                        onClick={stopCamera}
+                        className="inline-flex items-center justify-center bg-error text-white px-4 py-2 rounded hover:bg-error/80 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </div>
                 )}
                 {imagePreview && (
@@ -195,9 +589,6 @@ export default function Post() {
                       onClick={() => {
                         setImagePreview(null);
                         setFormData((prev) => ({ ...prev, image: "" }));
-                        if (cameraInputRef.current) {
-                          cameraInputRef.current.value = "";
-                        }
                         if (fileInputRef.current) {
                           fileInputRef.current.value = "";
                         }
@@ -208,6 +599,7 @@ export default function Post() {
                     </button>
                   </div>
                 )}
+                <canvas ref={canvasRef} className="hidden" />
               </div>
             </div>
 
