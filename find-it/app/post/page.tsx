@@ -128,7 +128,7 @@ export default function Post() {
       <div className="pt-16 py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-3xl mx-auto fade-in">
           <h1 className="text-3xl font-bold mb-8 text-center">Post a Found Item</h1>
-          <form onSubmit={handleSubmit} className="space General">space-y-6 bg-card-bg p-8 rounded-lg shadow-md">
+          <form onSubmit={handleSubmit} className="space General">space-y-6 bg-card-bg p-8 rounded-lg shadow-md"
             {error && (
               <div className="bg-error/10 border border-error text-error p-4 rounded">
                 {error}
