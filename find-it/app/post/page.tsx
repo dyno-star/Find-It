@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import Navbar from "../components/navbar";
@@ -26,103 +26,11 @@ export default function Post() {
   });
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isCameraActive, setIsCameraActive] = useState(false);
-  const [isCameraLoading, setIsCameraLoading] = useState(false);
-  const [cameraError, setCameraError] = useState<string | null>(null);
   const [tagInput, setTagInput] = useState("");
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Check camera availability
-  const checkCameraAvailability = async () => {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      return "Camera is not supported in this browser.";
-    }
-    try {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const hasCamera = devices.some((device) => device.kind === "videoinput");
-      if (!hasCamera) {
-        return "No camera found on this device.";
-      }
-      return null;
-    } catch {
-      return "Unable to check camera availability.";
-    }
-  };
-
-  // Start camera
-  const startCamera = async () => {
-    setIsCameraLoading(true);
-    setError(null);
-    setCameraError(null);
-
-    const availabilityError = await checkCameraAvailability();
-    if (availabilityError) {
-      setCameraError(availabilityError);
-      setIsCameraLoading(false);
-      return;
-    }
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.onloadedmetadata = () => {
-          videoRef.current?.play().catch(() => {
-            setCameraError("Failed to start camera feed. Please try again.");
-            setIsCameraActive(false);
-            setIsCameraLoading(false);
-          });
-          setIsCameraActive(true);
-          setIsCameraLoading(false);
-        };
-        streamRef.current = stream;
-      }
-    } catch (err: any) {
-      let errorMessage = "Failed to access camera.";
-      if (err.name === "NotAllowedError") {
-        errorMessage = "Camera access denied. Please allow camera access in your browser settings and try again.";
-      } else if (err.name === "NotFoundError") {
-        errorMessage = "No camera found on this device. Please try uploading an image.";
-      } else {
-        errorMessage = `Camera error: ${err.message}. Please try again or upload an image.`;
-      }
-      setCameraError(errorMessage);
-      setIsCameraActive(false);
-      setIsCameraLoading(false);
-    }
-  };
-
-  // Stop camera
-  const stopCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
-    setIsCameraActive(false);
-    setIsCameraLoading(false);
-    setCameraError(null);
-  };
-
-  // Capture photo
-  const capturePhoto = () => {
-    if (videoRef.current && canvasRef.current) {
-      const context = canvasRef.current.getContext("2d");
-      if (context) {
-        canvasRef.current.width = videoRef.current.videoWidth;
-        canvasRef.current.height = videoRef.current.videoHeight;
-        context.drawImage(videoRef.current, 0, 0);
-        const imageData = canvasRef.current.toDataURL("image/jpeg", 0.8);
-        setImagePreview(imageData);
-        setFormData((prev) => ({ ...prev, image: imageData }));
-        stopCamera();
-      }
-    }
-  };
-
-  // Handle file upload (fallback)
+  // Handle file upload (camera or gallery)
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -179,13 +87,6 @@ export default function Post() {
     }));
   };
 
-  // Cleanup camera on unmount
-  useEffect(() => {
-    return () => {
-      stopCamera();
-    };
-  }, []);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -209,6 +110,9 @@ export default function Post() {
       // Reset form
       setFormData({ image: "", description: "", tags: [], location: "" });
       setImagePreview(null);
+      if (cameraInputRef.current) {
+        cameraInputRef.current.value = "";
+      }
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -224,95 +128,57 @@ export default function Post() {
       <div className="pt-16 py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-3xl mx-auto fade-in">
           <h1 className="text-3xl font-bold mb-8 text-center">Post a Found Item</h1>
-          <form onSubmit={handleSubmit} className="space-y-6 bg-card-bg p-8 rounded-lg shadow-md">
+          <form onSubmit={handleSubmit} className="space General">space-y-6 bg-card-bg p-8 rounded-lg shadow-md">
             {error && (
               <div className="bg-error/10 border border-error text-error p-4 rounded">
                 {error}
               </div>
             )}
 
-            {/* Camera Capture */}
+            {/* Image Capture/Upload */}
             <div>
               <label className="block text-sm font-medium mb-2">Item Image</label>
               <div className="border-2 border-dashed border-border rounded-lg p-4 text-center">
-                {!isCameraActive && !imagePreview && !isCameraLoading && !cameraError && (
+                {!imagePreview && (
                   <div className="space-y-4">
-                    <button
-                      type="button"
-                      onClick={startCamera}
-                      className="cursor-pointer inline-flex items-center justify-center bg-primary text-white px-4 py-2 rounded hover:bg-primary-hover transition-colors"
-                    >
-                      Use Camera
-                    </button>
-                    <div className="text-sm text-secondary">or</div>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                      id="file-upload"
-                      ref={fileInputRef}
-                    />
-                    <label
-                      htmlFor="file-upload"
-                      className="cursor-pointer inline-flex items-center justify-center bg-secondary text-white px-4 py-2 rounded hover:bg-secondary/80 transition-colors"
-                    >
-                      Upload Image
-                    </label>
-                  </div>
-                )}
-                {isCameraLoading && (
-                  <div className="text-secondary">Loading camera...</div>
-                )}
-                {cameraError && (
-                  <div className="space-y-4">
-                    <p className="text-error">{cameraError}</p>
-                    <button
-                      type="button"
-                      onClick={startCamera}
-                      className="inline-flex items-center justify-center bg-primary text-white px-4 py-2 rounded hover:bg-primary-hover transition-colors"
-                    >
-                      Retry Camera
-                    </button>
-                    <div className="text-sm text-secondary">or</div>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                      id="file-upload"
-                      ref={fileInputRef}
-                    />
-                    <label
-                      htmlFor="file-upload"
-                      className="cursor-pointer inline-flex items-center justify-center bg-secondary text-white px-4 py-2 rounded hover:bg-secondary/80 transition-colors"
-                    >
-                      Upload Image
-                    </label>
-                    <p className="mt-4 text-sm text-secondary">
-                      To enable camera access, check your browser's address bar or settings and allow camera permissions.
-                    </p>
-                  </div>
-                )}
-                {isCameraActive && (
-                  <div className="space-y-4">
-                    <video ref={videoRef} autoPlay className="w-full max-w-md mx-auto rounded" />
                     <div className="flex justify-center gap-4">
-                      <button
-                        type="button"
-                        onClick={capturePhoto}
-                        className="inline-flex items-center justify-center bg-primary text-white px-4 py-2 rounded hover:bg-primary-hover transition-colors"
-                      >
-                        Capture
-                      </button>
-                      <button
-                        type="button"
-                        onClick={stopCamera}
-                        className="inline-flex items-center justify-center bg-error text-white px-4 py-2 rounded hover:bg-error/80 transition-colors"
-                      >
-                        Cancel
-                      </button>
+                      <div>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="environment" // Prompts camera on mobile
+                          onChange={handleFileUpload}
+                          className="hidden"
+                          id="camera-upload"
+                          ref={cameraInputRef}
+                        />
+                        <label
+                          htmlFor="camera-upload"
+                          className="cursor-pointer inline-flex items-center justify-center bg-primary text-white px-4 py-2 rounded hover:bg-primary-hover transition-colors"
+                        >
+                          Take Photo
+                        </label>
+                      </div>
+                      <div>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleFileUpload}
+                          className="hidden"
+                          id="file-upload"
+                          ref={fileInputRef}
+                        />
+                        <label
+                          htmlFor="file-upload"
+                          className="cursor-pointer inline-flex items-center justify-center bg-secondary text-white px-4 py-2 rounded hover:bg-secondary/80 transition-colors"
+                        >
+                          Upload Image
+                        </label>
+                      </div>
                     </div>
+                    <p className="text-sm text-secondary">
+                      Take a photo with your camera or upload an image from your device.
+                    </p>
                   </div>
                 )}
                 {imagePreview && (
@@ -329,6 +195,12 @@ export default function Post() {
                       onClick={() => {
                         setImagePreview(null);
                         setFormData((prev) => ({ ...prev, image: "" }));
+                        if (cameraInputRef.current) {
+                          cameraInputRef.current.value = "";
+                        }
+                        if (fileInputRef.current) {
+                          fileInputRef.current.value = "";
+                        }
                       }}
                       className="mt-2 text-sm text-error hover:underline"
                     >
@@ -336,7 +208,6 @@ export default function Post() {
                     </button>
                   </div>
                 )}
-                <canvas ref={canvasRef} className="hidden" />
               </div>
             </div>
 
