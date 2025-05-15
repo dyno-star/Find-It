@@ -41,8 +41,20 @@ export default function Post() {
   
   // Ensure refs are properly created with useEffect
   useEffect(() => {
-    // Don't create elements here, let the React refs attach to the DOM elements
-    // We'll handle the video element in the JSX directly
+    // Create video element if it doesn't exist
+    if (!videoRef.current) {
+      const video = document.createElement('video');
+      video.autoplay = true;
+      video.playsInline = true;
+      video.muted = true;
+      videoRef.current = video;
+    }
+    
+    // Create canvas element if it doesn't exist
+    if (!canvasRef.current) {
+      const canvas = document.createElement('canvas');
+      canvasRef.current = canvas;
+    }
     
     // Check camera support on component mount
     const checkCameraSupport = async () => {
@@ -101,6 +113,16 @@ export default function Post() {
         throw new Error("Camera API is not supported in this browser");
       }
       
+      // Make sure video element exists before proceeding
+      if (!videoRef.current) {
+        console.log("Video ref was null, creating new video element");
+        const video = document.createElement('video');
+        video.autoplay = true;
+        video.playsInline = true;
+        video.muted = true;
+        videoRef.current = video;
+      }
+      
       // List available devices to help with debugging
       const devices = await navigator.mediaDevices.enumerateDevices();
       const videoDevices = devices.filter(device => device.kind === 'videoinput');
@@ -126,36 +148,75 @@ export default function Post() {
       
       console.log("Using camera:", videoTracks[0].label);
       
-      // Store the stream in the ref for later cleanup
-      streamRef.current = stream;
-      
-      // Set active first so the video element will be in the DOM
-      setIsCameraActive(true);
-      
-      // Give React a moment to render the video element
-      setTimeout(() => {
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.play()
-            .then(() => {
-              console.log("Video playback started successfully");
-              setIsCameraLoading(false);
-              
-              // Clear the timeout since camera loaded successfully
-              if (cameraTimeoutRef.current) {
-                clearTimeout(cameraTimeoutRef.current);
-                cameraTimeoutRef.current = null;
-              }
-            })
-            .catch((err) => {
-              console.error("Camera play error:", err);
-              setCameraError(`Failed to start video stream: ${err.message}. Please try again or upload an image.`);
-              stopCamera();
-            });
-        } else {
-          throw new Error("Video element not found in DOM after activation");
-        }
-      }, 100);
+      // Ensure video element is properly initialized
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.muted = true;
+        videoRef.current.playsInline = true;
+        videoRef.current.autoplay = true;
+        
+        console.log("Video element initialized with stream");
+        
+        // Create promise to detect when video is ready to play
+        const videoPlayPromise = new Promise((resolve, reject) => {
+          if (!videoRef.current) {
+            reject(new Error("Video element not available"));
+            return;
+          }
+          
+          const handleDataLoaded = () => {
+            console.log("Video data loaded");
+            resolve(true);
+            videoRef.current?.removeEventListener('loadeddata', handleDataLoaded);
+          };
+          
+          const handleError = (e: Event) => {
+            console.error("Video element error event:", e);
+            reject(new Error("Video loading failed"));
+            videoRef.current?.removeEventListener('error', handleError);
+          };
+          
+          videoRef.current.addEventListener('loadeddata', handleDataLoaded);
+          videoRef.current.addEventListener('error', handleError);
+          
+          // If video is already loaded, resolve immediately
+          if (videoRef.current.readyState >= 2) {
+            console.log("Video already loaded");
+            resolve(true);
+            videoRef.current.removeEventListener('loadeddata', handleDataLoaded);
+          }
+        });
+        
+        // Wait for video to be ready
+        await videoPlayPromise;
+        
+        // Force a repaint to help with iOS Safari
+        setTimeout(() => {
+          if (videoRef.current) {
+            videoRef.current.play()
+              .then(() => {
+                console.log("Video playback started successfully");
+                setIsCameraActive(true);
+                setIsCameraLoading(false);
+                
+                // Clear the timeout since camera loaded successfully
+                if (cameraTimeoutRef.current) {
+                  clearTimeout(cameraTimeoutRef.current);
+                  cameraTimeoutRef.current = null;
+                }
+              })
+              .catch((err) => {
+                console.error("Camera play error:", err);
+                setCameraError(`Failed to start video stream: ${err.message}. Please try again or upload an image.`);
+                stopCamera();
+              });
+          }
+        }, 100);
+        
+        streamRef.current = stream;
+      } else {
+        throw new Error("Video element reference is not available after initialization");
+      }
     } catch (err: any) {
       // Clear the timeout since we already have an error
       if (cameraTimeoutRef.current) {
