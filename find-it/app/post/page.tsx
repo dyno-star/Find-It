@@ -41,15 +41,6 @@ export default function Post() {
   
   // Ensure refs are properly created with useEffect
   useEffect(() => {
-    // Create video element if it doesn't exist
-    if (!videoRef.current) {
-      const video = document.createElement('video');
-      video.autoplay = true;
-      video.playsInline = true;
-      video.muted = true;
-      videoRef.current = video;
-    }
-    
     // Create canvas element if it doesn't exist
     if (!canvasRef.current) {
       const canvas = document.createElement('canvas');
@@ -113,14 +104,24 @@ export default function Post() {
         throw new Error("Camera API is not supported in this browser");
       }
       
-      // Make sure video element exists before proceeding
+      // Find the video container in the DOM
+      const videoContainer = document.getElementById('video-container');
+      if (!videoContainer) {
+        throw new Error("Video container not found in DOM");
+      }
+      
+      // Create video element if it doesn't exist
       if (!videoRef.current) {
-        console.log("Video ref was null, creating new video element");
+        console.log("Creating new video element");
         const video = document.createElement('video');
         video.autoplay = true;
         video.playsInline = true;
         video.muted = true;
+        video.style.width = '100%';
+        video.style.height = 'auto';
+        video.style.borderRadius = '0.5rem';
         videoRef.current = video;
+        videoContainer.appendChild(video);
       }
       
       // List available devices to help with debugging
@@ -132,8 +133,8 @@ export default function Post() {
       const constraints = {
         video: {
           facingMode: { ideal: "environment" },
-          width: { ideal: 320 },
-          height: { ideal: 240 }
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
         }
       };
       
@@ -157,61 +158,56 @@ export default function Post() {
         
         console.log("Video element initialized with stream");
         
-        // Create promise to detect when video is ready to play
-        const videoPlayPromise = new Promise((resolve, reject) => {
+        // Wait for video to be ready to play
+        await new Promise<void>((resolve, reject) => {
           if (!videoRef.current) {
             reject(new Error("Video element not available"));
             return;
           }
           
-          const handleDataLoaded = () => {
-            console.log("Video data loaded");
-            resolve(true);
-            videoRef.current?.removeEventListener('loadeddata', handleDataLoaded);
+          const handleLoadedMetadata = () => {
+            console.log("Video metadata loaded");
+            videoRef.current?.removeEventListener('loadedmetadata', handleLoadedMetadata);
+            videoRef.current?.removeEventListener('error', handleError);
+            resolve();
           };
           
           const handleError = (e: Event) => {
             console.error("Video element error event:", e);
-            reject(new Error("Video loading failed"));
+            videoRef.current?.removeEventListener('loadedmetadata', handleLoadedMetadata);
             videoRef.current?.removeEventListener('error', handleError);
+            reject(new Error("Video loading failed"));
           };
           
-          videoRef.current.addEventListener('loadeddata', handleDataLoaded);
+          videoRef.current.addEventListener('loadedmetadata', handleLoadedMetadata);
           videoRef.current.addEventListener('error', handleError);
           
           // If video is already loaded, resolve immediately
-          if (videoRef.current.readyState >= 2) {
+          if (videoRef.current.readyState >= 1) {
             console.log("Video already loaded");
-            resolve(true);
-            videoRef.current.removeEventListener('loadeddata', handleDataLoaded);
+            videoRef.current.removeEventListener('loadedmetadata', handleLoadedMetadata);
+            videoRef.current.removeEventListener('error', handleError);
+            resolve();
           }
         });
         
-        // Wait for video to be ready
-        await videoPlayPromise;
-        
-        // Force a repaint to help with iOS Safari
-        setTimeout(() => {
-          if (videoRef.current) {
-            videoRef.current.play()
-              .then(() => {
-                console.log("Video playback started successfully");
-                setIsCameraActive(true);
-                setIsCameraLoading(false);
-                
-                // Clear the timeout since camera loaded successfully
-                if (cameraTimeoutRef.current) {
-                  clearTimeout(cameraTimeoutRef.current);
-                  cameraTimeoutRef.current = null;
-                }
-              })
-              .catch((err) => {
-                console.error("Camera play error:", err);
-                setCameraError(`Failed to start video stream: ${err.message}. Please try again or upload an image.`);
-                stopCamera();
-              });
+        // Play the video
+        try {
+          await videoRef.current.play();
+          console.log("Video playback started successfully");
+          setIsCameraActive(true);
+          setIsCameraLoading(false);
+          
+          // Clear the timeout since camera loaded successfully
+          if (cameraTimeoutRef.current) {
+            clearTimeout(cameraTimeoutRef.current);
+            cameraTimeoutRef.current = null;
           }
-        }, 100);
+        } catch (playError) {
+          console.error("Camera play error:", playError);
+          setCameraError(`Failed to start video stream: ${playError instanceof Error ? playError.message : 'Unknown error'}. Please try again or upload an image.`);
+          stopCamera();
+        }
         
         streamRef.current = stream;
       } else {
@@ -247,6 +243,7 @@ export default function Post() {
       }
       
       setCameraError(errorMessage);
+      setIsCameraLoading(false);
       stopCamera();
     }
   };
@@ -262,6 +259,13 @@ export default function Post() {
         videoRef.current.pause();
         videoRef.current.srcObject = null;
       }
+      
+      // Remove video element from DOM
+      const videoContainer = document.getElementById('video-container');
+      if (videoContainer && videoRef.current.parentNode === videoContainer) {
+        videoContainer.removeChild(videoRef.current);
+      }
+      videoRef.current = null;
     }
     
     // Stop all media tracks
@@ -568,35 +572,25 @@ export default function Post() {
                 {isCameraActive && (
                   <div className="space-y-4">
                     <div className="relative w-full max-w-md mx-auto">
-                      {/* Use a div to hold our dynamically created video */}
+                      {/* Container for the video element */}
                       <div 
                         id="video-container" 
-                        className="w-full max-w-md mx-auto rounded bg-gray-100" 
-                        style={{ minHeight: "240px" }}
+                        className="w-full max-w-md mx-auto rounded-lg overflow-hidden bg-gray-900 flex items-center justify-center" 
+                        style={{ minHeight: "480px" }}
                       ></div>
-                      {/* Video loading indicator */}
-                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <div className="p-4 bg-white/70 rounded-lg shadow-sm">
-                          <p className="text-sm text-gray-600">
-                            {videoRef.current && videoRef.current.readyState < 2 
-                              ? "Initializing camera..." 
-                              : "Camera active"}
-                          </p>
-                        </div>
-                      </div>
                     </div>
                     <div className="flex justify-center gap-4">
                       <button
                         type="button"
                         onClick={capturePhoto}
-                        className="inline-flex items-center justify-center bg-primary text-white px-4 py-2 rounded hover:bg-primary-hover transition-colors"
+                        className="inline-flex items-center justify-center bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary-hover transition-colors font-medium"
                       >
-                        Capture
+                        Capture Photo
                       </button>
                       <button
                         type="button"
                         onClick={stopCamera}
-                        className="inline-flex items-center justify-center bg-error text-white px-4 py-2 rounded hover:bg-error/80 transition-colors"
+                        className="inline-flex items-center justify-center bg-error text-white px-6 py-3 rounded-lg hover:bg-error/80 transition-colors font-medium"
                       >
                         Cancel
                       </button>
