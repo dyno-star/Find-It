@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Navbar from "../components/navbar";
 
 interface Item {
@@ -18,6 +19,7 @@ const tagExamples = [
 ];
 
 export default function Post() {
+  const router = useRouter();
   const [formData, setFormData] = useState<Item>({
     image: "",
     description: "",
@@ -456,7 +458,9 @@ export default function Post() {
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
-      alert("Item posted successfully!");
+      
+      // Redirect to home page to see the new item
+      router.push("/");
     } catch (err) {
       setError("Failed to post item. Please try again.");
     }
