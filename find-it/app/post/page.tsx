@@ -104,10 +104,23 @@ export default function Post() {
         throw new Error("Camera API is not supported in this browser");
       }
       
-      // Find the video container in the DOM
-      const videoContainer = document.getElementById('video-container');
+      // Find or create the video container in the DOM
+      let videoContainer = document.getElementById('video-container');
       if (!videoContainer) {
-        throw new Error("Video container not found in DOM");
+        // Create container if it doesn't exist (shouldn't happen, but handle gracefully)
+        console.log("Video container not found, creating it dynamically");
+        videoContainer = document.createElement('div');
+        videoContainer.id = 'video-container';
+        videoContainer.className = 'w-full max-w-md mx-auto rounded-lg overflow-hidden bg-gray-900 flex items-center justify-center';
+        videoContainer.style.minHeight = '480px';
+        
+        // Find the parent container and insert it
+        const parentContainer = document.querySelector('.border-2.border-dashed');
+        if (parentContainer) {
+          parentContainer.appendChild(videoContainer);
+        } else {
+          throw new Error("Could not find parent container for video");
+        }
       }
       
       // Create video element if it doesn't exist
@@ -569,16 +582,14 @@ export default function Post() {
                     </p>
                   </div>
                 )}
+                {/* Always render video container, but show it only when camera is active or loading */}
+                <div 
+                  id="video-container" 
+                  className={`w-full max-w-md mx-auto rounded-lg overflow-hidden bg-gray-900 flex items-center justify-center ${isCameraActive || isCameraLoading ? '' : 'hidden'}`}
+                  style={{ minHeight: "480px" }}
+                ></div>
                 {isCameraActive && (
-                  <div className="space-y-4">
-                    <div className="relative w-full max-w-md mx-auto">
-                      {/* Container for the video element */}
-                      <div 
-                        id="video-container" 
-                        className="w-full max-w-md mx-auto rounded-lg overflow-hidden bg-gray-900 flex items-center justify-center" 
-                        style={{ minHeight: "480px" }}
-                      ></div>
-                    </div>
+                  <div className="space-y-4 mt-4">
                     <div className="flex justify-center gap-4">
                       <button
                         type="button"
