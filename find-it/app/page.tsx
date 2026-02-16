@@ -1,8 +1,39 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import Navbar from "./components/navbar";
 
+interface Item {
+  id: string;
+  image: string;
+  description: string;
+  tags: string[];
+  location: string;
+}
+
 export default function Home() {
+  const [recentItems, setRecentItems] = useState<Item[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchRecentItems = async () => {
+      try {
+        const res = await fetch("/api/posts");
+        const data = await res.json();
+        // Get the 6 most recent items
+        setRecentItems(data.slice(0, 6));
+      } catch (error) {
+        console.error("Failed to fetch recent items:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchRecentItems();
+  }, []);
+
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
@@ -69,28 +100,59 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Recent Posts Section (Mock) */}
+        {/* Recent Posts Section */}
         <section className="py-16 px-4 sm:px-6 lg:px-8">
           <div className="max-w-7xl mx-auto fade-in">
             <h2 className="text-3xl font-bold mb-6 text-center">Recent Found Items</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="bg-card-bg rounded-lg shadow-md overflow-hidden">
-                  <Image
-                    src="/placeholder.svg"
-                    alt="Lost item"
-                    width={300}
-                    height={200}
-                    className="w-full h-48 object-cover"
-                  />
-                  <div className="p-4">
-                    <h3 className="text-lg font-semibold">Lost Keys</h3>
-                    <p className="text-secondary">Found near Library on Apr 20, 2025</p>
-                    <p className="text-sm mt-2">Tags: Keys, Silver, Keychain</p>
+            {isLoading ? (
+              <div className="text-center py-12">
+                <p className="text-secondary">Loading recent items...</p>
+              </div>
+            ) : recentItems.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-secondary">No items found yet. Be the first to post a found item!</p>
+                <Link
+                  href="/post"
+                  className="inline-block mt-4 bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary-hover transition-colors"
+                >
+                  Post a Found Item
+                </Link>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+                {recentItems.map((item) => (
+                  <div key={item.id} className="bg-card-bg rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
+                    <div className="relative w-full h-48 bg-gray-200">
+                      <Image
+                        src={item.image}
+                        alt={item.description}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                    <div className="p-4">
+                      <h3 className="text-lg font-semibold mb-2 line-clamp-2">{item.description}</h3>
+                      <p className="text-secondary text-sm mb-2">Found at: {item.location}</p>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {item.tags.slice(0, 3).map((tag) => (
+                          <span
+                            key={tag}
+                            className="inline-block px-2 py-1 text-xs bg-primary/10 text-primary rounded-full"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                        {item.tags.length > 3 && (
+                          <span className="inline-block px-2 py-1 text-xs text-secondary">
+                            +{item.tags.length - 3} more
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </section>
       </div>
